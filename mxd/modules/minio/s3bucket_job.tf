@@ -18,7 +18,7 @@
 #
 
 resource "kubernetes_job" "create_minio_bucket" {
-  depends_on = [kubernetes_deployment.minio, kubernetes_service.minio-service]
+  depends_on = [kubernetes_stateful_set.minio, kubernetes_service.minio-service]
   metadata {
     name = "${var.humanReadableName}-create-minio-bucket"
   }

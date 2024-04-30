@@ -17,7 +17,7 @@
 #  SPDX-License-Identifier: Apache-2.0
 #
 
-resource "kubernetes_deployment" "azurite" {
+resource "kubernetes_stateful_set" "azurite" {
   metadata {
     name = local.appName
     labels = {
@@ -26,6 +26,7 @@ resource "kubernetes_deployment" "azurite" {
   }
 
   spec {
+    service_name = "azurite"
     replicas = 1
     selector {
       match_labels = {
@@ -48,6 +49,13 @@ resource "kubernetes_deployment" "azurite" {
             container_port = local.port
             name           = "blob-port"
           }
+
+          volume_mount {
+            name = "data"
+            mount_path = "/data"
+            sub_path = ""
+          }
+
           env_from {
             config_map_ref {
               name = kubernetes_config_map.azurite-config.metadata[0].name
@@ -55,6 +63,24 @@ resource "kubernetes_deployment" "azurite" {
           }
         }
       }
+    }
+    volume_claim_template {
+      metadata {
+        name = "data"
+      }
+      spec {
+        access_modes       = ["ReadWriteOnce"]
+        storage_class_name = "standard"
+        resources {
+          requests = {
+            storage = "10M"
+          }
+        }
+      }
+    }
+    persistent_volume_claim_retention_policy {
+      when_deleted = "Delete"
+      when_scaled  = "Delete"
     }
   }
 }
@@ -74,7 +100,7 @@ resource "kubernetes_service" "azurite" {
   }
   spec {
     selector = {
-      App = kubernetes_deployment.azurite.spec.0.template.0.metadata[0].labels.App
+      App = kubernetes_stateful_set.azurite.spec.0.template.0.metadata[0].labels.App
     }
     port {
       name = "blob-port"

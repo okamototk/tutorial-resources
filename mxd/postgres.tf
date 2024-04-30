@@ -17,7 +17,7 @@
 #  SPDX-License-Identifier: Apache-2.0
 #
 
-resource "kubernetes_deployment" "postgres" {
+resource "kubernetes_stateful_set" "postgres" {
   metadata {
     name = "postgres"
     labels = {
@@ -26,6 +26,7 @@ resource "kubernetes_deployment" "postgres" {
   }
 
   spec {
+    service_name = "postgres-service"
     replicas = 1
     selector {
       match_labels = {
@@ -51,6 +52,11 @@ resource "kubernetes_deployment" "postgres" {
           port {
             container_port = 5432
             name           = "postgres-port"
+          }
+          volume_mount {
+            name = "pgdata"
+            mount_path = "/var/lib/postgresql/data"
+            sub_path = ""
           }
 
           volume_mount {
@@ -85,6 +91,24 @@ resource "kubernetes_deployment" "postgres" {
           }
         }
       }
+    }
+    volume_claim_template {
+      metadata {
+        name = "pgdata"
+      }
+      spec {
+        access_modes       = ["ReadWriteOnce"]
+        storage_class_name = "standard"
+        resources {
+          requests = {
+            storage = "10M"
+          }
+        }
+      }
+    }
+    persistent_volume_claim_retention_policy {
+      when_deleted = "Delete"
+      when_scaled  = "Delete"
     }
   }
 }
@@ -127,7 +151,7 @@ resource "kubernetes_service" "pg-service" {
   }
   spec {
     selector = {
-      App = kubernetes_deployment.postgres.spec.0.template.0.metadata[0].labels.App
+      App = kubernetes_stateful_set.postgres.spec.0.template.0.metadata[0].labels.App
     }
     port {
       name        = "pg-port"

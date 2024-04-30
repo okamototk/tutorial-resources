@@ -17,7 +17,7 @@
 #  SPDX-License-Identifier: Apache-2.0
 #
 
-resource "kubernetes_deployment" "minio" {
+resource "kubernetes_stateful_set" "minio" {
   metadata {
     name = "${var.humanReadableName}-minio"
     labels = {
@@ -26,13 +26,11 @@ resource "kubernetes_deployment" "minio" {
   }
 
   spec {
+    service_name = "${var.humanReadableName}-minio"
     selector {
       match_labels = {
         app = "${var.humanReadableName}-minio"
       }
-    }
-    strategy {
-      type = "Recreate"
     }
 
     template {
@@ -63,8 +61,31 @@ resource "kubernetes_deployment" "minio" {
             name           = "console-port"
             container_port = var.minio-console-port
           }
+          volume_mount {
+            name = "storage"
+            mount_path = "/storage"
+            sub_path = ""
+          }
         }
       }
+    }
+    volume_claim_template {
+      metadata {
+        name = "storage"
+      }
+      spec {
+        access_modes       = ["ReadWriteOnce"]
+        storage_class_name = "standard"
+        resources {
+          requests = {
+            storage = "10M"
+          }
+        }
+      }
+    }
+    persistent_volume_claim_retention_policy {
+      when_deleted = "Delete"
+      when_scaled  = "Delete"
     }
   }
 }
